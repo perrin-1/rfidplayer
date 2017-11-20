@@ -1,0 +1,14 @@
+[Unit]
+Description=Mopidy RFID Player service
+Requires=local-fs.target
+After=lightdm.service
+#Requires=network-online.target
+
+[Service]
+Type=forking
+GuessMainPID=no
+StandardInput=null
+ExecStart=/home/pi/rfidplayerd.sh
+
+[Install]
+WantedBy=default.target

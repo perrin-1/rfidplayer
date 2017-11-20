@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=mopidy
+Exec=mopidy
+#X-GNOME-Autostart-Delay=5
+StartupNotify=false

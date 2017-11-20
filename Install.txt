@@ -1,0 +1,122 @@
+use raspian minimal with pixel
+
+#####BASE CONFIG
+raspi-config -> ssh enable, keyboard-layout german, advanced enable spi
+network-connection wifi via gui
+ 
+
+#####x11vnc server
+
+sudo apt-get install x11vnc
+x11vnc -storepasswd /home/pi/vncpasswd
+                                  
+
+/home/pi/.config/autostart/x11vnc.desktop:
+
+[Desktop Entry]
+Encoding=UTF-8
+Type=Application
+Name=X11VNC
+Comment=
+Exec=x11vnc -forever -usepw -display :0 -ultrafilexfer -rfbauth /home/pi/vncpasswd
+StartupNotify=false
+Terminal=false
+Hidden=false
+  
+  
+#####mopidy autostart
+/home/pi/.config/autostart/mopidy1.desktop:
+
+[Desktop Entry]
+Type=Application
+Name=mopidy
+Exec=mopidy
+#X-GNOME-Autostart-Delay=5
+StartupNotify=false
+ 
+ 
+###packages needed for pip
+sudo apt-get install build-essential python-dev libffi-dev python-websocket
+
+###packages needed for mopidy
+sudo apt-get install python-gst-1.0 \
+    gir1.2-gstreamer-1.0 gir1.2-gst-plugins-base-1.0 \
+    gstreamer1.0-plugins-good gstreamer1.0-plugins-ugly \
+    gstreamer1.0-tools
+
+
+
+####install libspotify
+sudo apt-get install apt-transport-https
+
+wget -q -O - http://apt.mopidy.com/mopidy.gpg | sudo apt-key add -
+
+# Add the following to /etc/apt/sources.list, or if you have the directory /etc/apt/sources.list.d/, add it to a file called mopidy.list in that directory:
+
+# Mopidy APT archive
+deb http://apt.mopidy.com/ stable main contrib non-free
+deb-src http://apt.mopidy.com/ stable main contrib non-free
+
+
+sudo apt-get install libspotify-dev
+
+#alternate wget http://apt.mopidy.com/dists/jessie/non-free/binary-armhf/libspotify-dev_12.1.103-0mopidy1_armhf.deb && dpkg -i libspotify-dev_12.1.103-0mopidy1_armhf.deb 
+ 
+ 
+ 
+###pip needed packages
+sudo pip install mopidy
+sudo pip install https://github.com/ismailof/mopidy-json-client/archive/master.zip
+sudo pip install mopidy-touchscreen mopidy-spotify
+
+
+###RFID Reader Packages
+sudo pip install pi-rc522
+
+git clone https://github.com/lthiery/SPI-Py.git
+cd SPI-Py/
+sudo python setup.py install
+
+
+##### link to patched touchscreen source
+ln -s /usr/local/lib/python2.7/dist-packages/mopidy_touchscreen /home/pi/mopidy_touchscreen_source
+
+ 
+#####patched mopidy touchscreen files
+in /usr/local/lib/python2.7/dist-packages/mopidy_touchscreen
+-> replace patched files screen_manager.py screens/main_screen.py screen/menu_screen.py
+
+e.g. sudo cp -r mopidy_touchscreen/screen* /usr/local/lib/python2.7/dist-packages/mopidy_touchscreen
+
+##### sqlite version: Install phpliteadmin
+wget https://bitbucket.org/phpliteadmin/public/downloads/phpLiteAdmin_v1-9-7-1.zip
+unzip phpLiteAdmin_v1-9-7-1.zip
+
+
+sudo apt install lighttpd
+sudo apt install php5-cgi
+sudo lighty-enable-mod fastcgi-php
+
+sudo service lighttpd start
+
+sudo mv phpliteadmin.*.php /var/www/html
+
+cd /var/www/html/
+
+-> Install config file and empty db
+
+chmod 666 rfidplayer.sqlite
+
+
+### install base files
+cp rfidplayer-sqlite.py /home/pi
+cp rfidplayer.sh /home/pi
+sudo cp service/rfidplayer.service /etc/systemd/system
+-> enable service
+sudo systemctl enable rfidplayer.service
+
+
+
+
+
+  
