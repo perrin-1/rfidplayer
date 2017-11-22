@@ -1,5 +1,5 @@
 #!/usr/bin/python
-from mopidy_json_client import MopidyClient, SimpleListener
+from mopidy_json_client import MopidyClient
 import time
 from threading import Timer
 from mopidy_json_client.formatting import print_nice
@@ -7,13 +7,13 @@ import logging
 import logging.handlers
 
 from pirc522 import RFID
-import RPi.GPIO as GPIO 
+#import RPi.GPIO as GPIO 
 import sys
 import signal
 import sqlite3 
 
-
-
+defaultFileUnknownTag="file:///home/pi/Music/EntschuldigeDieseKarteKenneIchNicht.mp3"
+defaultFileTagReadError="file:///home/pi/Music/EntschuldigeIchKonnteDieseKarteNichtLesen.mp3"
 
 # Global Functions for Timer Objects
 def bl_dim():
@@ -36,7 +36,7 @@ def bl_on():
     sysfile.close()
     #wait some time for the previous SPI command to finish
     time.sleep (0.5)
-    applog.info ("setting max brightness") 
+    #applog.info ("setting max brightness") 
     sysfile = open("/sys/class/backlight/rpi_backlight/brightness","w")
     sysfile.write(str(255))
     sysfile.close()
@@ -50,7 +50,7 @@ def lookupUriInDB(tagUID):
     #convert tagUID into tuple
     t = (tagUID,)
     #Insert Statistic Data into tagstats table
-    c.execute('INSERT INTO tagstats (tag_id) VALUES (?)',t) 
+    c.execute('INSERT INTO tagstats (tag_id, timestamp) VALUES (?, datetime(CURRENT_TIMESTAMP, \'localtime\'))',t) 
     conn.commit()
     
     
@@ -73,19 +73,6 @@ def lookupUriInDB(tagUID):
 
 
 # Helper Functions
-def readConfig ():
-  configTracks = { }
-  with open("rfidplayer.conf") as configfile:
-    for line in configfile:
-        line.rstrip('\n')
-        #applog.debug ("Debug: Line "+line)
-        if not line.startswith("#"):
-          #applog.debug ("Debug: Line added")
-          name, var = line.partition("=")[::2]
-          configTracks[name.strip()] = var.rstrip('\n')
-          
-  return configTracks
-
 def signal_term_handler(signal, frame):
     applog.info ('got SIGTERM')
     applog.info ('ending RFIDPlayer') 
@@ -102,7 +89,7 @@ def signal_term_handler(signal, frame):
 
 
 
-class MopidyListenerClient(SimpleListener):
+class MopidyListenerClient(MopidyClient):
     """A simple mopidy Client class using the JSON WS interface of mopidy"""
     
     def __init__(self, debug=False):
@@ -118,7 +105,7 @@ class MopidyListenerClient(SimpleListener):
         # Instantiate Mopidy Client
         self.mopidy = MopidyClient(
             ws_url='ws://localhost:6680/mopidy/ws',
-            event_handler=self.on_event,
+            #event_handler=self.on_event,
             connection_handler=self.on_connection,
             autoconnect=False,
             retry_max=None,
@@ -127,12 +114,14 @@ class MopidyListenerClient(SimpleListener):
         
 
         self.mopidy.debug_client(self.debug_flag)
+        self.mopidy.bind_event('playback_state_changed', self.playback_state_changed)
         self.mopidy.connect()
         
         # Instantiate Timer Objects
         self.backlight_dim_timer = None
         self.backlight_off_timer = None
-
+        
+     
     def playback_state_changed(self, old_state, new_state):     
         self.state = new_state
         applog.info('Playback state changed to '+ str(self.state))
@@ -140,7 +129,7 @@ class MopidyListenerClient(SimpleListener):
     
     def backlight_timer_control(self):
         #try to stop existing timers before starting new timers
-        applog.info ("stopping backlight timers ")
+        applog.debug ("stopping backlight timers ")
         if (self.backlight_dim_timer is not None):
           self.backlight_dim_timer.cancel()
         if (self.backlight_off_timer is not None):
@@ -149,7 +138,7 @@ class MopidyListenerClient(SimpleListener):
         bl_on()
           
         if (self.state != 'playing'):
-          applog.info ("starting backlight timers")
+          applog.debug ("starting backlight timers")
           self.backlight_dim_timer = Timer(30.0,bl_dim)
           self.backlight_off_timer = Timer(60.0,bl_off)
           self.backlight_dim_timer.start()
@@ -162,8 +151,8 @@ class MopidyListenerClient(SimpleListener):
             # Initialize mopidy track and state
             self.state = self.mopidy.playback.get_state(timeout=5)
             tl_track = self.mopidy.playback.get_current_tl_track(timeout=15)
-            self.track_playback_started(tl_track)
-            applog.debug ("On Conn: Current state "+self.state)
+            #self.track_playback_started(tl_track)
+            #applog.debug ("On Conn: Current state "+self.state)
             self.backlight_timer_control()
         else:
             self.state = 'stopped'
@@ -198,7 +187,7 @@ if __name__ == "__main__":
     #Logging facilities - we will log to /var/log/rfidplayer.log since this app is build to run as a daemon
     applog = logging.getLogger()
     #set global loglevel [default DEBUG]
-    applog.setLevel(logging.DEBUG)
+    applog.setLevel(logging.INFO)
     formatter = logging.Formatter('[%(threadName)s] %(module)s.%(funcName)s: %(levelname)s: %(message)s')
     
     
@@ -208,11 +197,11 @@ if __name__ == "__main__":
     applog.addHandler(logFileHandler)
     
     
-    # Handler for stdout - enable three lines for foreground debugging
+    # Handler for stdout - enable four lines for foreground debugging
     #stdOutHandler = logging.StreamHandler(sys.stdout)
     #stdOutHandler.setFormatter(formatter)
     #applog.addHandler(stdOutHandler)
-    
+    #applog.setLevel(logging.DEBUG)
     
     
     mopidyClient = MopidyListenerClient(debug=False)
@@ -222,11 +211,6 @@ if __name__ == "__main__":
       applog.debug ("Waiting for server connection ")
       time.sleep (0.5)
     
-    #rebuild to sqlite
-    #Array holding all configured Tags with their respective tracks/playlists/albums
-    #configTracks = None
-
-    #configTracks = readConfig()
     
     applog.info("RFIDplayer ready for requests...") 
     
@@ -239,37 +223,35 @@ if __name__ == "__main__":
           (error, uid) = rdr.anticoll()
           if not error:
             # turn on backlight
-            bl_on()
+            #bl_on()
             tagUID = str(uid[0])+"-"+str(uid[1])+"-"+str(uid[2])+"-"+str(uid[3])+"-"+str(uid[4])                                                              
             
             if (lastTag != tagUID) or ((lastTag == tagUID) and (mopidyClient.state!='playing')) :
               # set lastTag
               lastTag = tagUID
               
-              applog.info ("Tag UID2: " +tagUID)
-              #try to find UID in Tracklist
-              #sqlite rebuild
+              applog.info ("Tag UID: " +tagUID)
+              #try to find UID in TrackDB
               tagURI = lookupUriInDB (tagUID)
               if tagURI is None:
                 applog.warning ("Tag UID "+tagUID+" not in config file")
+                applog.warning ("Playing default file")
+                mopidyClient.tracklist_tune(defaultFileUnknownTag)
               else: 
                 applog.info ("Found Track. Playing "+tagURI)
                 mopidyClient.tracklist_tune(tagURI)
                 
-              #if tagUID in configTracks:
-              #  applog.info ("Found Track. Playing "+configTracks[tagUID])
-              #  mopidyClient.tracklist_tune(configTracks[tagUID])
-              #else:
-              #  applog.warning ("Tag UID "+tagUID+" not in config file")
-                
-                if (mopidyClient.state == 'stopped'):
-                  mopidyClient.backlight_timer_control()
-                else:
-                  mopidyClient.playback_stop()
+                ### CHECK IS THIS NEEDED? Backlight should be off by event in Client
+                #if (mopidyClient.state == 'stopped'):
+                #  mopidyClient.backlight_timer_control()
+                #else:
+                #  mopidyClient.playback_stop()
             else:
               applog.info ("Duplicate Tag reading and still playing, skipped.")
           else:
               applog.warning ("Tag reading error")
+              applog.warning ("Playing default file")
+              mopidyClient.tracklist_tune(defaultFileTagReadError)
           #sleep to prevent multiple tag reads
           time.sleep (1)
 

@@ -1,9 +1,17 @@
 use raspian minimal with pixel
 
+
 #####BASE CONFIG
-raspi-config -> ssh enable, keyboard-layout german, advanced enable spi
+boot/config.txt -> add line lcd_rotate=2
+raspi-config -> ssh enable, keyboard-layout german, advanced enable spi, timezone Europe/Berlin
+
 network-connection wifi via gui
+install ssh key
  
+sudo apt-get update 
+sudo apt-get upgrade
+sudo apt-get install vim
+
 
 #####x11vnc server
 
@@ -57,7 +65,7 @@ wget -q -O - http://apt.mopidy.com/mopidy.gpg | sudo apt-key add -
 deb http://apt.mopidy.com/ stable main contrib non-free
 deb-src http://apt.mopidy.com/ stable main contrib non-free
 
-
+sudo apt-get update
 sudo apt-get install libspotify-dev
 
 #alternate wget http://apt.mopidy.com/dists/jessie/non-free/binary-armhf/libspotify-dev_12.1.103-0mopidy1_armhf.deb && dpkg -i libspotify-dev_12.1.103-0mopidy1_armhf.deb 
@@ -78,7 +86,7 @@ cd SPI-Py/
 sudo python setup.py install
 
 
-##### link to patched touchscreen source
+##### link to patched touchscreen source for easier access
 ln -s /usr/local/lib/python2.7/dist-packages/mopidy_touchscreen /home/pi/mopidy_touchscreen_source
 
  
@@ -88,35 +96,45 @@ in /usr/local/lib/python2.7/dist-packages/mopidy_touchscreen
 
 e.g. sudo cp -r mopidy_touchscreen/screen* /usr/local/lib/python2.7/dist-packages/mopidy_touchscreen
 
-##### sqlite version: Install phpliteadmin
-wget https://bitbucket.org/phpliteadmin/public/downloads/phpLiteAdmin_v1-9-7-1.zip
-unzip phpLiteAdmin_v1-9-7-1.zip
 
-
-sudo apt install lighttpd
-sudo apt install php5-cgi
+### install lighttpd for web based management
+sudo apt install lighttpd php-cgi
 sudo lighty-enable-mod fastcgi-php
 
 sudo service lighttpd start
 
-sudo mv phpliteadmin.*.php /var/www/html
 
 cd /var/www/html/
 
 -> Install config file and empty db
+sudo apt install sqlite3  php-sqlite3
+sudo touch /var/www/html/rfidplayer.sqlite
+sudo chmod 666 /var/www/html/rfidplayer.sqlite
+sudo chown www-data:www-data rfidplayer.sqlite
 
-chmod 666 rfidplayer.sqlite
+#####sqlite Version Install tageditor
+cp tag-editor/* /var/www/html
 
+##### sqlite version: optional: Install phpliteadmin
+wget https://bitbucket.org/phpliteadmin/public/downloads/phpLiteAdmin_v1-9-7-1.zip
+unzip phpLiteAdmin_v1-9-7-1.zip
+sudo mv phpliteadmin.*.php /var/www/html
 
 ### install base files
 cp rfidplayer-sqlite.py /home/pi
 cp rfidplayer.sh /home/pi
+
+chmod +x /home/pi/rfidplayer*
+
 sudo cp service/rfidplayer.service /etc/systemd/system
 -> enable service
 sudo systemctl enable rfidplayer.service
 
 
+sudo reboot
 
+
+#### finished!
 
 
   

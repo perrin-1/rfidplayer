@@ -8,7 +8,7 @@ After=lightdm.service
 Type=forking
 GuessMainPID=no
 StandardInput=null
-ExecStart=/home/pi/rfidplayerd.sh
+ExecStart=/home/pi/rfidplayer.sh
 
 [Install]
 WantedBy=default.target
