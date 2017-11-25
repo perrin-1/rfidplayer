@@ -198,16 +198,6 @@ python setup.py install
 #sudo python setup.py install
 #cd ..
 
-read -r -p "Do you want to continue? [y/N] " response
-case "$response" in
-    [yY][eE][sS]|[yY]) 
-        echo "Continuing..."
-        ;;
-    *)
-        exit 0
-        ;;
-esac
-
 ##### link to patched touchscreen source for easier access
 #ln -s /usr/local/lib/python2.7/dist-packages/mopidy_touchscreen /home/pi/mopidy_touchscreen_source
 
@@ -252,7 +242,17 @@ echo "-> enable service"
 systemctl enable rfidplayer.service
 
 echo "#### finished!"
-echo "please reboot now"
+read -r -p "Do you want to reboot now? [y/N] " response
+case "$response" in
+    [yY][eE][sS]|[yY]) 
+        echo "rebooting..."
+        reboot
+        ;;
+    *)
+        exit 0
+        ;;
+esac
+
 
 
   
