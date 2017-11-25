@@ -87,9 +87,9 @@ dtparam spi=$SETTING
 
 
 echo "set timezone"
-if grep -Fxq Berlin "/etc/timezone" 
+if grep -Fxq Europe/Berlin "/etc/timezone" 
 then
-  echo "Timezone is already set to Berlin"
+  echo "Timezone is already set to Europe/Berlin"
 else
   dpkg-reconfigure tzdata
 fi
