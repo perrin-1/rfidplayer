@@ -5,4 +5,4 @@ checkout git repository
 git clone https://github.com/perrin-1/rfidplayer.git
 
 run setup script 
-sudo bash ./rfidplayer/setup.sh
+sudo bash ./rfidplayer/install.sh
