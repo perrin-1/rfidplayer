@@ -87,7 +87,7 @@ dtparam spi=$SETTING
 
 
 echo "set timezone"
-if grep -Fxq "/etc/timezone Berlin
+if grep -Fxq "/etc/timezone" Berlin
 then
   echo "Timezone is already set to Berlin"
 else
