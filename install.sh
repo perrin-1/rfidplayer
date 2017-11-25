@@ -93,6 +93,9 @@ dpkg-reconfigure tzdata
 echo "please install ssh key manually"
 mkdir /home/pi/.ssh
 touch /home/pi/.ssh/authorized_keys
+read -r -p "Please paste your sshkey now: " sshkey
+echo $sshkey > /home/pi/.ssh/authorized_keys
+
 chown -R pi:pi /home/pi/.ssh
 
 echo "Updating base system"
@@ -127,6 +130,8 @@ chown pi:pi /home/pi/vncpasswd
 
 echo "MANUAL WORK"
 echo "copy .config directory"
+cp -r /home/pi/rfidplayer/.config/* /home/pi/.config
+
 
 echo "/home/pi/.config/autostart/x11vnc.desktop:"
 if [ -f /home/pi/.config/autostart/x11vnc.desktop ]; then
@@ -142,6 +147,9 @@ else
    echo "mopidy Autostart not found"
 fi
  
+ 
+ 
+ 
 echo "###pip needed packages"
 pip install mopidy
 pip install https://github.com/ismailof/mopidy-json-client/archive/master.zip
@@ -152,11 +160,28 @@ echo "###RFID Reader Packages"
 #pip install pi-rc522 # this installs an older version of the library.
 git clone https://github.com/ondryaso/pi-rc522.git
 cd pi-rc522
+
+#echo patching file
+cd pirc522
+patch < /home/pi/rfidplayer/rfid.patch
+cd ..
+echo "done patching"
+
 python setup.py install
 #git clone https://github.com/lthiery/SPI-Py.git
 #cd SPI-Py/
 #sudo python setup.py install
 #cd ..
+
+read -r -p "Do you want to continue? [y/N] " response
+case "$response" in
+    [yY][eE][sS]|[yY]) 
+        echo "Continuing..."
+        ;;
+    *)
+        exit 0
+        ;;
+esac
 
 ##### link to patched touchscreen source for easier access
 #ln -s /usr/local/lib/python2.7/dist-packages/mopidy_touchscreen /home/pi/mopidy_touchscreen_source
@@ -166,7 +191,7 @@ echo "#####patched mopidy touchscreen files"
 echo "in /usr/local/lib/python2.7/dist-packages/mopidy_touchscreen"
 echo "-> replace patched files screen_manager.py screens/main_screen.py screen/menu_screen.py"
 
-cp -r mopidy_touchscreen/screen* /usr/local/lib/python2.7/dist-packages/mopidy_touchscreen
+cp -r /home/pi/rfidplayer/mopidy_touchscreen/screen* /usr/local/lib/python2.7/dist-packages/mopidy_touchscreen
 
 
 echo "### configurer lighttpd for web based management"
@@ -179,11 +204,12 @@ service lighttpd start
 echo "-> Install config file and empty db"
 touch /var/www/html/rfidplayer.sqlite
 chmod 666 /var/www/html/rfidplayer.sqlite
-chown www-data:www-data rfidplayer.sqlite
+chown www-data:www-data /var/www/html/rfidplayer.sqlite
+sqlite3 /var/www/html/rfidplayer.sqlite < /home/pi/rfidplayer/rfidplayer.sql
 chmod a+w /var/www/html
 
 echo "#####sqlite Version Install tageditor"
-cp tag-editor/* /var/www/html
+cp /home/pi/rfidplayer/tag-editor/* /var/www/html
 
 ##### sqlite version: optional: Install phpliteadmin
 #wget https://bitbucket.org/phpliteadmin/public/downloads/phpLiteAdmin_v1-9-7-1.zip
@@ -196,7 +222,7 @@ cp tag-editor/* /var/www/html
 
 chmod +x /home/pi/rfidplayer*
 
-cp /home/pi/service/rfidplayer.service /etc/systemd/system
+cp /home/pi/rfidplayer/service/rfidplayer.service /etc/systemd/system
 echo "-> enable service"
 systemctl enable rfidplayer.service
 

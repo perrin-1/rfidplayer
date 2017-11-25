@@ -1,0 +1,18 @@
+--- rfid.py	2017-11-24 20:39:11.784472344 +0100
++++ rfid-patch.py	2017-11-25 09:18:38.740276608 +0100
+@@ -176,7 +176,6 @@
+                 error = False
+ 
+                 if n & irq & 0x01:
+-                    print("E1")
+                     error = True
+ 
+                 if command == self.mode_transrec:
+@@ -196,7 +195,6 @@
+                     for i in range(n):
+                         back_data.append(self.dev_read(0x09))
+             else:
+-                print("E2")
+                 error = True
+ 
+         return (error, back_data, back_length)
