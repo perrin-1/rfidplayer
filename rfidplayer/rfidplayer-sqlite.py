@@ -237,7 +237,7 @@ if __name__ == "__main__":
         #wait for new tag - only works if IRQ line is connected to RPi PIN GPIO24!
         #Otherwise use device polling
         #applog.debug ("Waiting for tag ")
-        #rdr.wait_for_tag()
+        rdr.wait_for_tag()
         (error, tag_type) = rdr.request()
         if not error:
           applog.debug("RFID Tag detected")
