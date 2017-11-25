@@ -14,48 +14,24 @@ import sqlite3
 
 defaultFileUnknownTag="file:///home/pi/Music/EntschuldigeDieseKarteKenneIchNicht.mp3"
 defaultFileTagReadError="file:///home/pi/Music/EntschuldigeIchKonnteDieseKarteNichtLesen.mp3"
+rfidplayerDB="/var/www/html/rfidplayer.sqlite"
 
-# Global Functions for Timer Objects
-def bl_dim():
-    applog.info ("dimming backlight... ")
-    sysfile = open("/sys/class/backlight/rpi_backlight/brightness","w")
-    sysfile.write(str(20))
-    sysfile.close()
-    
-def bl_off():
-    applog.info ("turning off backlight ")
-    sysfile = open("/sys/class/backlight/rpi_backlight/bl_power","w")
-    sysfile.write(str(1))
-    sysfile.close()
 
-    
-def bl_on():
-    applog.info ("turning on backlight ")
-    sysfile = open("/sys/class/backlight/rpi_backlight/bl_power","w")
-    sysfile.write(str(0))
-    sysfile.close()
-    #wait some time for the previous SPI command to finish
-    time.sleep (0.5)
-    #applog.info ("setting max brightness") 
-    sysfile = open("/sys/class/backlight/rpi_backlight/brightness","w")
-    sysfile.write(str(255))
-    sysfile.close()
 
 
 # Find a tag in Database
 def lookupUriInDB(tagUID):
     applog.debug ("Looking up tagUID %s"%tagUID)
-    conn = sqlite3.connect('/var/www/html/rfidplayer.sqlite')
+    conn = sqlite3.connect(rfidplayerDB)
     c = conn.cursor()
     #convert tagUID into tuple
     t = (tagUID,)
+    
     #Insert Statistic Data into tagstats table
     c.execute('INSERT INTO tagstats (tag_id, timestamp) VALUES (?, datetime(CURRENT_TIMESTAMP, \'localtime\'))',t) 
     conn.commit()
-    
-    
+        
     #Search the URI for the tag
-   
     c.execute('SELECT tag_uri FROM tagconfig WHERE tag_id = ?', t)
     URI = c.fetchone()
     if URI is None:
@@ -67,9 +43,6 @@ def lookupUriInDB(tagUID):
     # We can also close the connection if we are done with it.
     # Just be sure any changes have been committed or they will be lost.
     conn.close()
-
-
-
 
 
 # Helper Functions
@@ -120,27 +93,57 @@ class MopidyListenerClient(MopidyClient):
         # Instantiate Timer Objects
         self.backlight_dim_timer = None
         self.backlight_off_timer = None
+    
+        # Functions for Timer Objects
+    def bl_dim(self):
+        applog.info ("dimming backlight... ")
+        sysfile = open("/sys/class/backlight/rpi_backlight/brightness","w")
+        sysfile.write(str(20))
+        sysfile.close()
+        
+    def bl_off(self):
+        applog.info ("turning off backlight ")
+        sysfile = open("/sys/class/backlight/rpi_backlight/bl_power","w")
+        sysfile.write(str(1))
+        sysfile.close()
+    
+        
+    def bl_on(self):
+        applog.info ("turning on backlight ")
+        sysfile = open("/sys/class/backlight/rpi_backlight/bl_power","w")
+        sysfile.write(str(0))
+        sysfile.close()
+        #wait some time for the previous SPI command to finish
+        time.sleep (0.5)
+        #applog.info ("setting max brightness") 
+        sysfile = open("/sys/class/backlight/rpi_backlight/brightness","w")
+        sysfile.write(str(255))
+        sysfile.close()
+    
+    
         
      
     def playback_state_changed(self, old_state, new_state):     
         self.state = new_state
-        applog.info('Playback state changed to '+ str(self.state))
+        applog.info('State changed: '+str(old_state)+ ' => '+ str(self.state))
         self.backlight_timer_control()
     
     def backlight_timer_control(self):
+        #Handle backlight timers
         #try to stop existing timers before starting new timers
         applog.debug ("stopping backlight timers ")
+        
         if (self.backlight_dim_timer is not None):
           self.backlight_dim_timer.cancel()
         if (self.backlight_off_timer is not None):
           self.backlight_off_timer.cancel()
         #applog.debug ("turn on backlight")
-        bl_on()
+        self.bl_on()
           
         if (self.state != 'playing'):
           applog.debug ("starting backlight timers")
-          self.backlight_dim_timer = Timer(30.0,bl_dim)
-          self.backlight_off_timer = Timer(60.0,bl_off)
+          self.backlight_dim_timer = Timer(30.0,self.bl_dim)
+          self.backlight_off_timer = Timer(60.0,self.bl_off)
           self.backlight_dim_timer.start()
           self.backlight_off_timer.start()
            
@@ -181,14 +184,10 @@ class MopidyListenerClient(MopidyClient):
 
 if __name__ == "__main__":
 
-    #Initialize RFID reader
-    rdr = RFID()
-
     #Logging facilities - we will log to /var/log/rfidplayer.log since this app is build to run as a daemon
     applog = logging.getLogger()
-    #set global loglevel [default DEBUG]
-    applog.setLevel(logging.INFO)
-    formatter = logging.Formatter('[%(threadName)s] %(module)s.%(funcName)s: %(levelname)s: %(message)s')
+   
+    formatter = logging.Formatter('<%(asctime)s> [%(threadName)s] %(module)s.%(funcName)s: %(levelname)s: %(message)s')
     
     
     #Handler for daemon logfile
@@ -198,17 +197,35 @@ if __name__ == "__main__":
     
     
     # Handler for stdout - enable four lines for foreground debugging
-    #stdOutHandler = logging.StreamHandler(sys.stdout)
-    #stdOutHandler.setFormatter(formatter)
-    #applog.addHandler(stdOutHandler)
+    stdOutHandler = logging.StreamHandler(sys.stdout)
+    stdOutHandler.setFormatter(formatter)
+    applog.addHandler(stdOutHandler)
     #applog.setLevel(logging.DEBUG)
+    #set global loglevel [default DEBUG]
+    applog.setLevel(logging.INFO)
     
+    #Initialize RFID reader
+    rdr = RFID()
+    # set antenna gain
+    #rdr.dev_write(0x26, (0x06<<4))
+    applog.debug ("Antenna gain "+str(rdr.dev_read(0x26)))
+    rdr.set_antenna(False)
+    rdr.reset()
+    rdr.dev_write(0x2A, 0x8D)
+    rdr.dev_write(0x2B, 0x3E)
+    rdr.dev_write(0x2D, 30)
+    rdr.dev_write(0x2C, 0)
+    rdr.dev_write(0x15, 0x40)
+    rdr.dev_write(0x11, 0x3D)
+    rdr.dev_write(0x26, (0x07<<4))
+    rdr.set_antenna(True)
+    
+    applog.debug ("Antenna gain "+str(rdr.dev_read(0x26)))
     
     mopidyClient = MopidyListenerClient(debug=False)
     
-    
     while not mopidyClient.mopidy.is_connected():
-      applog.debug ("Waiting for server connection ")
+      applog.warn ("Waiting for server connection ")
       time.sleep (0.5)
     
     
@@ -217,35 +234,34 @@ if __name__ == "__main__":
     lastTag = ""
     try:
       while True:
+        #wait for new tag - only works if IRQ line is connected to RPi PIN GPIO24!
+        #Otherwise use device polling
+        #applog.debug ("Waiting for tag ")
+        #rdr.wait_for_tag()
         (error, tag_type) = rdr.request()
         if not error:
           applog.debug("RFID Tag detected")
           (error, uid) = rdr.anticoll()
           if not error:
-            # turn on backlight
-            #bl_on()
             tagUID = str(uid[0])+"-"+str(uid[1])+"-"+str(uid[2])+"-"+str(uid[3])+"-"+str(uid[4])                                                              
-            
             if (lastTag != tagUID) or ((lastTag == tagUID) and (mopidyClient.state!='playing')) :
               # set lastTag
               lastTag = tagUID
-              
-              applog.info ("Tag UID: " +tagUID)
+              applog.debug ("Tag UID: " +tagUID)
               #try to find UID in TrackDB
               tagURI = lookupUriInDB (tagUID)
+              #check mopidy connection
+              while not mopidyClient.mopidy.is_connected():
+                applog.warn ("Waiting for server connection ")
+                time.sleep (0.5)
+              
               if tagURI is None:
                 applog.warning ("Tag UID "+tagUID+" not in config file")
                 applog.warning ("Playing default file")
                 mopidyClient.tracklist_tune(defaultFileUnknownTag)
               else: 
-                applog.info ("Found Track. Playing "+tagURI)
+                applog.info ("Found Track for UID "+tagUID+". Playing "+tagURI)
                 mopidyClient.tracklist_tune(tagURI)
-                
-                ### CHECK IS THIS NEEDED? Backlight should be off by event in Client
-                #if (mopidyClient.state == 'stopped'):
-                #  mopidyClient.backlight_timer_control()
-                #else:
-                #  mopidyClient.playback_stop()
             else:
               applog.info ("Duplicate Tag reading and still playing, skipped.")
           else:
@@ -254,16 +270,15 @@ if __name__ == "__main__":
               mopidyClient.tracklist_tune(defaultFileTagReadError)
           #sleep to prevent multiple tag reads
           time.sleep (1)
-
         time.sleep (0.5) 
 
     except KeyboardInterrupt:
       applog.info ('ending RFIDPlayer') 
     finally:
+      # turn the backlight on
+      mopidyClient.bl_on()
       # disconnect from mopidy      
       mopidyClient.mopidy.disconnect()
-      # turn the backlight on
-      bl_on()
       # Calls GPIO cleanup
       rdr.cleanup()
       

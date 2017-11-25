@@ -1,36 +1,125 @@
-
-#use raspian minimal with pixel
 #!/bin/bash
+#use raspian minimal with pixel
+CONFIG=/boot/config.txt
+
+echo "Quick Install script for RFIDPlayer."
+echo "Warn: This script is quick an dirty work."
+read -r -p "Do you want to continue? [y/N] " response
+case "$response" in
+    [yY][eE][sS]|[yY]) 
+        echo "Continuing..."
+        ;;
+    *)
+        exit 0
+        ;;
+esac
 
 #####BASE CONFIG
+
+
+if [ "$(id -u)" != "0" ]; then
+   echo "This script must be run as root" 1>&2
+   exit 1
+fi
+
 echo "boot/config.txt -> add line lcd_rotate=2"
-sudo echo "lcd_rotate=2" >> /boot/config.txt
-echo "raspi-config -> ssh enable, keyboard-layout german, advanced enable spi, timezone Europe/Berlin"
+if grep -Fxq lcd_rotate=2  /boot/config.txt
+then
+    # code if found
+    echo "Boot config has already been modified"
+else
+    # code if not found
+    echo "lcd_rotate=2" >> /boot/config.txt
+fi
 
-echo "network-connection wifi via gui"
-echo "install ssh key"
+
+#
+echo "Doing raspi-config -> ssh enable, keyboard-layout german, advanced enable spi, timezone Europe/Berlin"
+
+#subroutine to set config variables.
+#source credits: raspi-config
+set_config_var() {
+  lua - "$1" "$2" "$3" <<EOF > "$3.bak"
+local key=assert(arg[1])
+local value=assert(arg[2])
+local fn=assert(arg[3])
+local file=assert(io.open(fn))
+local made_change=false
+for line in file:lines() do
+  if line:match("^#?%s*"..key.."=.*$") then
+    line=key.."="..value
+    made_change=true
+  end
+  print(line)
+end
+
+if not made_change then
+  print(key.."="..value)
+end
+EOF
+mv "$3.bak" "$3"
+}
+
+echo "Enable ssh"
+update-rc.d ssh enable &&
+invoke-rc.d ssh start &&
+
+echo "German Keyboard layout"
+dpkg-reconfigure keyboard-configuration &&
+printf "Reloading keymap. This may take a short while\n" &&
+invoke-rc.d keyboard-setup start || return $?
+udevadm trigger --subsystem-match=input --action=change
+
+echo "enable SPI"
+SETTING=on
+STATUS=enabled
+BLACKLIST=/etc/modprobe.d/raspi-blacklist.conf
+
+set_config_var dtparam=spi $SETTING $CONFIG &&
+if ! [ -e $BLACKLIST ]; then
+  touch $BLACKLIST
+fi
+sed $BLACKLIST -i -e "s/^\(blacklist[[:space:]]*spi[-_]bcm2708\)/#\1/"
+dtparam spi=$SETTING
+
+#whiptail --msgbox "The SPI interface is $STATUS" 20 60 1
 
 
- 
-sudo apt-get update 
-sudo apt-get upgrade
+
+echo "set timezone"
+dpkg-reconfigure tzdata
+
+
+echo "please install ssh key manually"
+mkdir /home/pi/.ssh
+touch /home/pi/.ssh/authorized_keys
+chown -R pi:pi /home/pi/.ssh
+
+echo "Updating base system"
+apt-get update 
+apt-get -y upgrade
+#doing upgrade twice as package chromium-rpi-mods fails the first time
+apt-get -y upgrade
 echo "installing packages" 
-sudo apt-get install vim x11vnc build-essential python-dev libffi-dev python-websocket python-gst-1.0 \
+apt-get -y install vim x11vnc build-essential python-dev libffi-dev python-websocket python-gst-1.0 \
     gir1.2-gstreamer-1.0 gir1.2-gst-plugins-base-1.0 gstreamer1.0-plugins-good gstreamer1.0-plugins-ugly \
     gstreamer1.0-tools apt-transport-https lighttpd php-cgi sqlite3  php-sqlite3
 
 
+#echo "Debug exit script now."
+#exit 0
+
 ####install libspotify
 
+echo "Installing Mopidy Repository"
 wget -q -O - http://apt.mopidy.com/mopidy.gpg | sudo apt-key add -
 
 # Mopidy APT archive
 echo "deb http://apt.mopidy.com/ stable main contrib non-free" > /etc/apt/sources.list.d/mopidy.list
 echo "deb-src http://apt.mopidy.com/ stable main contrib non-free" >> /etc/apt/sources.list.d/mopidy.list
 
-
-sudo apt-get update
-sudo apt-get install libspotify-dev
+apt-get update
+apt-get -y install libspotify-dev
 
 echo "##### configure x11vnc server"
 x11vnc -storepasswd /home/pi/vncpasswd
@@ -38,24 +127,36 @@ chown pi:pi /home/pi/vncpasswd
 
 echo "MANUAL WORK"
 echo "copy .config directory"
-echo /home/pi/.config/autostart/x11vnc.desktop:
-  
-echo #####mopidy autostart
-echo /home/pi/.config/autostart/mopidy1.desktop:
 
+echo "/home/pi/.config/autostart/x11vnc.desktop:"
+if [ -f /home/pi/.config/autostart/x11vnc.desktop ]; then
+   echo "x11vnc Autostart found [OK]"
+else
+   echo "x11vnc Autostart not found"
+fi
+echo "#####mopidy autostart"
+echo "/home/pi/.config/autostart/mopidy1.desktop:"
+if [ -f /home/pi/.config/autostart/mopidy1.desktop ]; then
+   echo "mopidy Autostart found [OK]"
+else
+   echo "mopidy Autostart not found"
+fi
  
 echo "###pip needed packages"
-sudo pip install mopidy
-sudo pip install https://github.com/ismailof/mopidy-json-client/archive/master.zip
-sudo pip install mopidy-touchscreen mopidy-spotify
+pip install mopidy
+pip install https://github.com/ismailof/mopidy-json-client/archive/master.zip
+pip install mopidy-touchscreen mopidy-spotify
 
 
 echo "###RFID Reader Packages"
-sudo pip install pi-rc522
-git clone https://github.com/lthiery/SPI-Py.git
-cd SPI-Py/
-sudo python setup.py install
-cd ..
+#pip install pi-rc522 # this installs an older version of the library.
+git clone https://github.com/ondryaso/pi-rc522.git
+cd pi-rc522
+python setup.py install
+#git clone https://github.com/lthiery/SPI-Py.git
+#cd SPI-Py/
+#sudo python setup.py install
+#cd ..
 
 ##### link to patched touchscreen source for easier access
 #ln -s /usr/local/lib/python2.7/dist-packages/mopidy_touchscreen /home/pi/mopidy_touchscreen_source
@@ -65,21 +166,21 @@ echo "#####patched mopidy touchscreen files"
 echo "in /usr/local/lib/python2.7/dist-packages/mopidy_touchscreen"
 echo "-> replace patched files screen_manager.py screens/main_screen.py screen/menu_screen.py"
 
-sudo cp -r mopidy_touchscreen/screen* /usr/local/lib/python2.7/dist-packages/mopidy_touchscreen
+cp -r mopidy_touchscreen/screen* /usr/local/lib/python2.7/dist-packages/mopidy_touchscreen
 
 
 echo "### configurer lighttpd for web based management"
-sudo lighty-enable-mod fastcgi-php
-sudo service lighttpd start
+lighty-enable-mod fastcgi-php
+service lighttpd start
 
 
 #cd /var/www/html/
 
 echo "-> Install config file and empty db"
-sudo touch /var/www/html/rfidplayer.sqlite
-sudo chmod 666 /var/www/html/rfidplayer.sqlite
-sudo chown www-data:www-data rfidplayer.sqlite
-sudo chmod a+w /var/www/html
+touch /var/www/html/rfidplayer.sqlite
+chmod 666 /var/www/html/rfidplayer.sqlite
+chown www-data:www-data rfidplayer.sqlite
+chmod a+w /var/www/html
 
 echo "#####sqlite Version Install tageditor"
 cp tag-editor/* /var/www/html
@@ -95,23 +196,12 @@ cp tag-editor/* /var/www/html
 
 chmod +x /home/pi/rfidplayer*
 
-sudo cp /home/pi/service/rfidplayer.service /etc/systemd/system
+cp /home/pi/service/rfidplayer.service /etc/systemd/system
 echo "-> enable service"
-sudo systemctl enable rfidplayer.service
+systemctl enable rfidplayer.service
 
-read -r -p "Reboot now? [y/N] " response
-case "$response" in
-    [yY][eE][sS]|[yY]) 
-        sudo reboot
-        ;;
-    *)
-        echo "Reboot cancelled"
-        ;;
-esac
-
-
-
-echo "#### finished!""
+echo "#### finished!"
+echo "please reboot now"
 
 
   
