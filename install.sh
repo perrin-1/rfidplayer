@@ -91,12 +91,15 @@ dpkg-reconfigure tzdata
 
 
 echo "please install ssh key manually"
-mkdir /home/pi/.ssh
-touch /home/pi/.ssh/authorized_keys
-read -r -p "Please paste your sshkey now: " sshkey
-echo $sshkey > /home/pi/.ssh/authorized_keys
-
-chown -R pi:pi /home/pi/.ssh
+if [ -f $/home/pi/.ssh/authorized_keys ]; then
+  echo "sshkeys have already been installed"
+else
+  mkdir /home/pi/.ssh
+  touch /home/pi/.ssh/authorized_keys
+  read -r -p "Please paste your sshkey now: " sshkey
+  echo $sshkey > /home/pi/.ssh/authorized_keys
+  chown -R pi:pi /home/pi/.ssh
+fi
 
 echo "Updating base system"
 apt-get update 
