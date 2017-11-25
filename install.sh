@@ -110,6 +110,9 @@ echo $NEW_HOSTNAME > /etc/hostname
 sed -i "s/127.0.1.1.*$CURRENT_HOSTNAME/127.0.1.1\t$NEW_HOSTNAME/g" /etc/hosts
 
 
+echo "enable bashrc aliases"
+sed -i "s/#alias l/alias l/g" /home/pi/.bashrc
+ 
 
 
 echo "please install ssh key manually"
@@ -153,7 +156,7 @@ echo "##### configure x11vnc server"
 x11vnc -storepasswd /home/pi/vncpasswd
 chown pi:pi /home/pi/vncpasswd
 
-echo "MANUAL WORK"
+
 echo "copy .config directory"
 cp -r /home/pi/rfidplayer/.config/* /home/pi/.config
 
@@ -162,20 +165,17 @@ echo "/home/pi/.config/autostart/x11vnc.desktop:"
 if [ -f /home/pi/.config/autostart/x11vnc.desktop ]; then
    echo "x11vnc Autostart found [OK]"
 else
-   echo "x11vnc Autostart not found"
+   echo "Warn: x11vnc Autostart not found"
 fi
 echo "#####mopidy autostart"
 echo "/home/pi/.config/autostart/mopidy1.desktop:"
 if [ -f /home/pi/.config/autostart/mopidy1.desktop ]; then
    echo "mopidy Autostart found [OK]"
 else
-   echo "mopidy Autostart not found"
+   echo "Warn: mopidy Autostart not found"
 fi
  
- 
- 
- 
-echo "###pip needed packages"
+echo "###pip needed packages mopidy, mopidy-touchscreen"
 pip install mopidy
 pip install https://github.com/ismailof/mopidy-json-client/archive/master.zip
 pip install mopidy-touchscreen mopidy-spotify
@@ -186,7 +186,7 @@ echo "###RFID Reader Packages"
 git clone https://github.com/ondryaso/pi-rc522.git
 cd pi-rc522
 
-#echo patching file
+echo "patching RFID file - hide error print"
 cd pirc522
 patch < /home/pi/rfidplayer/rfid.patch
 cd ..
@@ -241,9 +241,9 @@ cp /home/pi/rfidplayer/tag-editor/* /var/www/html
 #unzip phpLiteAdmin_v1-9-7-1.zip
 #sudo mv phpliteadmin.*.php /var/www/html
 
-### install base files
-#cp rfidplayer-sqlite.py /home/pi
-#cp rfidplayer.sh /home/pi
+echo "### install base files"
+cp /home/pi/rfidplayer/rfidplayer/rfidplayer-sqlite.py /home/pi
+cp /home/pi/rfidplayer/rfidplayer/rfidplayer.sh /home/pi
 
 chmod +x /home/pi/rfidplayer*
 
