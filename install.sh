@@ -100,22 +100,15 @@ No other symbols, punctuation characters, or blank spaces are permitted.\
 
 
 CURRENT_HOSTNAME=`cat /etc/hostname | tr -d " \t\n\r"`
-if [ "$INTERACTIVE" = True ]; then
-  NEW_HOSTNAME=$(whiptail --inputbox "Please enter a hostname" 20 60 "$CURRENT_HOSTNAME" 3>&1 1>&2 2>&3)
-else
-  NEW_HOSTNAME=$1
-  true
-fi
-if [ $? -eq 0 ]; then
-  echo $NEW_HOSTNAME > /etc/hostname
-  sed -i "s/127.0.1.1.*$CURRENT_HOSTNAME/127.0.1.1\t$NEW_HOSTNAME/g" /etc/hosts
-fi
+NEW_HOSTNAME=$(whiptail --inputbox "Please enter a hostname" 20 60 "$CURRENT_HOSTNAME" 3>&1 1>&2 2>&3)
+echo $NEW_HOSTNAME > /etc/hostname
+sed -i "s/127.0.1.1.*$CURRENT_HOSTNAME/127.0.1.1\t$NEW_HOSTNAME/g" /etc/hosts
 
 
 
 
 echo "please install ssh key manually"
-if [ -f $/home/pi/.ssh/authorized_keys ]; then
+if [ -f /home/pi/.ssh/authorized_keys ]; then
   echo "sshkeys have already been installed"
 else
   mkdir /home/pi/.ssh
