@@ -234,6 +234,7 @@ cp /home/pi/rfidplayer/tag-editor/* /var/www/html
 echo "### install base files"
 cp /home/pi/rfidplayer/rfidplayer/rfidplayer-sqlite.py /home/pi
 cp /home/pi/rfidplayer/rfidplayer/rfidplayer.sh /home/pi
+cp /home/pi/rfidplayer/Music/* /home/pi/Music
 
 chmod +x /home/pi/rfidplayer*
 
