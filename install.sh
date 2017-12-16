@@ -237,6 +237,7 @@ cp /home/pi/rfidplayer/rfidplayer/rfidplayer.sh /home/pi
 cp /home/pi/rfidplayer/Music/* /home/pi/Music
 
 chmod +x /home/pi/rfidplayer*
+chown -R pi:pi /home/pi/.config
 
 cp /home/pi/rfidplayer/service/rfidplayer.service /etc/systemd/system
 echo "-> enable service"
